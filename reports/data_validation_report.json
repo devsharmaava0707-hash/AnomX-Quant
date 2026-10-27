@@ -1,0 +1,95 @@
+{
+  "dataset_path": "C:\\Users\\devsh\\AnomX\\data\\raw\\events.csv",
+  "rows": 100000,
+  "columns": 34,
+  "checks_passed": 16,
+  "checks_failed": 0,
+  "warnings": 1,
+  "results": [
+    {
+      "check": "Dataset is not empty",
+      "status": "PASS",
+      "details": "Rows found: 100,000"
+    },
+    {
+      "check": "Dataset has columns",
+      "status": "PASS",
+      "details": "Columns found: 34"
+    },
+    {
+      "check": "Duplicate column names",
+      "status": "PASS",
+      "details": "No duplicate column names."
+    },
+    {
+      "check": "Event IDs are unique",
+      "status": "PASS",
+      "details": "Duplicate event IDs: 0"
+    },
+    {
+      "check": "Event IDs are present",
+      "status": "PASS",
+      "details": "Missing event IDs: 0"
+    },
+    {
+      "check": "Required columns are present",
+      "status": "PASS",
+      "details": "Expected: event_id, timestamp, is_anomalous"
+    },
+    {
+      "check": "Missing values",
+      "status": "WARNING",
+      "details": "{'ip_address': 77981, 'country': 77989, 'device': 65939, 'login_success': 77992, 'failed_attempts': 77992, 'timezone_gap_hours': 78015, 'instrument': 64778, 'lot_size': 64782, 'trade_volume': 64778, 'pnl': 64782, 'margin_used': 64782, 'trade_duration_seconds': 64782, 'trade_volume_vs_baseline': 64778, 'is_night_trade': 64845, 'amount': 74887, 'method': 74887, 'is_immediate_withdrawal': 74933, 'session_duration_mins': 87927, 'page_clicks': 87927, 'click_rate_per_min': 87927, 'kyc_change_type': 94121, 'anomaly_group_id': 99990, 'anomaly_severity': 99601}"
+    },
+    {
+      "check": "Anomaly labels are valid",
+      "status": "PASS",
+      "details": "Invalid or missing labels: 0"
+    },
+    {
+      "check": "Both normal and anomalous events exist",
+      "status": "PASS",
+      "details": "Normal: 99,601; Anomalous: 399; Anomalous percentage: 0.399%"
+    },
+    {
+      "check": "User anomaly flags are valid",
+      "status": "PASS",
+      "details": "Invalid or missing user flags: 0"
+    },
+    {
+      "check": "Timestamps can be parsed",
+      "status": "PASS",
+      "details": "Invalid or missing timestamps: 0"
+    },
+    {
+      "check": "Timestamps are chronologically ordered",
+      "status": "PASS",
+      "details": "Checks whether rows are sorted from earliest to latest."
+    },
+    {
+      "check": "Timestamps fall within configured dates",
+      "status": "PASS",
+      "details": "Outside configured range: 0; configured dates: 2025-01-01 to 2025-12-31"
+    },
+    {
+      "check": "trade_volume contains numeric values",
+      "status": "PASS",
+      "details": "Non-numeric values: 0"
+    },
+    {
+      "check": "trade_volume is non-negative",
+      "status": "PASS",
+      "details": "Negative values: 0"
+    },
+    {
+      "check": "Anomaly type and label consistency",
+      "status": "PASS",
+      "details": "Rows with a non-normal anomaly_type but label 0: 0. Review these rows; some datasets may use anomaly_type for metadata rather than labels."
+    },
+    {
+      "check": "Row count matches configuration",
+      "status": "PASS",
+      "details": "Expected: 100,000; actual: 100,000"
+    }
+  ]
+}

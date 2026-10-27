@@ -1,7 +1,31 @@
-
+# AnomX synthetic data generator configuration
 data:
   random_seed: 42
   n_users: 1000
-  n_events: 50000
+  n_events: 100000
   anomaly_fraction: 0.05
-  raw_path: data/raw/events.csv
+  start_date: "2025-01-01"
+  end_date: "2025-12-31"
+  raw_path: "data/raw/events.csv"
+
+anomalies:
+  # Available patterns include the original ten plus five advanced patterns.
+  enabled:
+    - ip_hopper
+    - wash_trader
+    - deposit_withdrawal_cycler
+    - bot_trader
+    - structurer
+    - brute_forcer
+    - dormant_withdrawer
+    - consistent_winner
+    - device_switcher
+    - kyc_manipulator
+    - account_takeover
+    - impossible_travel
+    - burst_activity
+    - coordinated_accounts
+    - behavioural_drift
+
+  # Used by future generator extensions for controlling pattern intensity.
+  severity: mixed

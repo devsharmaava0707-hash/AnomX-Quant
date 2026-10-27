@@ -1,0 +1,58 @@
+ANOMX DATA VALIDATION REPORT
+========================================
+Dataset: C:\Users\devsh\AnomX\data\raw\events.csv
+Rows: 100,000
+Columns: 34
+
+[PASS] Dataset is not empty
+  Rows found: 100,000
+
+[PASS] Dataset has columns
+  Columns found: 34
+
+[PASS] Duplicate column names
+  No duplicate column names.
+
+[PASS] Event IDs are unique
+  Duplicate event IDs: 0
+
+[PASS] Event IDs are present
+  Missing event IDs: 0
+
+[PASS] Required columns are present
+  Expected: event_id, timestamp, is_anomalous
+
+[WARNING] Missing values
+  {'ip_address': 77981, 'country': 77989, 'device': 65939, 'login_success': 77992, 'failed_attempts': 77992, 'timezone_gap_hours': 78015, 'instrument': 64778, 'lot_size': 64782, 'trade_volume': 64778, 'pnl': 64782, 'margin_used': 64782, 'trade_duration_seconds': 64782, 'trade_volume_vs_baseline': 64778, 'is_night_trade': 64845, 'amount': 74887, 'method': 74887, 'is_immediate_withdrawal': 74933, 'session_duration_mins': 87927, 'page_clicks': 87927, 'click_rate_per_min': 87927, 'kyc_change_type': 94121, 'anomaly_group_id': 99990, 'anomaly_severity': 99601}
+
+[PASS] Anomaly labels are valid
+  Invalid or missing labels: 0
+
+[PASS] Both normal and anomalous events exist
+  Normal: 99,601; Anomalous: 399; Anomalous percentage: 0.399%
+
+[PASS] User anomaly flags are valid
+  Invalid or missing user flags: 0
+
+[PASS] Timestamps can be parsed
+  Invalid or missing timestamps: 0
+
+[PASS] Timestamps are chronologically ordered
+  Checks whether rows are sorted from earliest to latest.
+
+[PASS] Timestamps fall within configured dates
+  Outside configured range: 0; configured dates: 2025-01-01 to 2025-12-31
+
+[PASS] trade_volume contains numeric values
+  Non-numeric values: 0
+
+[PASS] trade_volume is non-negative
+  Negative values: 0
+
+[PASS] Anomaly type and label consistency
+  Rows with a non-normal anomaly_type but label 0: 0. Review these rows; some datasets may use anomaly_type for metadata rather than labels.
+
+[PASS] Row count matches configuration
+  Expected: 100,000; actual: 100,000
+
+SUMMARY: 16 passed, 0 failed, 1 warnings

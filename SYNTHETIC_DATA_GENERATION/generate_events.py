@@ -15,8 +15,10 @@ SEED         = config["data"]["random_seed"]
 N_USERS      = config["data"]["n_users"]
 N_EVENTS     = config["data"]["n_events"]
 ANOMALY_FRAC = config["data"]["anomaly_fraction"]
-START_DATE   = datetime(2024, 1, 1)
-END_DATE     = datetime(2024, 3, 31)
+START_DATE = datetime.fromisoformat(config["data"].get("start_date", "2024-01-01"))
+END_DATE = datetime.fromisoformat(config["data"].get("end_date", "2024-12-31"))
+if END_DATE <= START_DATE:
+    raise ValueError("data.end_date must be later than data.start_date")
 
 np.random.seed(SEED)
 random.seed(SEED)
@@ -46,10 +48,21 @@ ANOMALY_TYPES = [
     "consistent_winner",
     "device_switcher",
     "kyc_manipulator",
+    "account_takeover",
+    "impossible_travel",
+    "burst_activity",
+    "coordinated_accounts",
+    "behavioural_drift",
 ]
 
 # Hub IPs shared across multiple anomalous users — for network graph anomaly detection
 SHARED_IPS = [f"172.16.{i}.1" for i in range(10)]
+ENABLED_ANOMALY_TYPES = config.get("anomalies", {}).get("enabled", ANOMALY_TYPES)
+unknown_anomalies = sorted(set(ENABLED_ANOMALY_TYPES) - set(ANOMALY_TYPES))
+if unknown_anomalies:
+    raise ValueError(f"Unknown anomaly types in config: {unknown_anomalies}")
+if not ENABLED_ANOMALY_TYPES:
+    raise ValueError("At least one anomaly type must be enabled")
 
 def random_timestamp(start=START_DATE, end=END_DATE):
     delta = end - start
@@ -69,7 +82,7 @@ def build_user_profiles():
     for i in range(N_USERS):
         user_id      = f"USER_{i:04d}"
         is_anomalous = i < n_anomalous
-        anomaly_type = random.choice(ANOMALY_TYPES) if is_anomalous else None
+        anomaly_type = random.choice(ENABLED_ANOMALY_TYPES) if is_anomalous else None
 
         if is_anomalous and random.random() < 0.3:
             home_ip = random.choice(SHARED_IPS)
@@ -86,8 +99,12 @@ def build_user_profiles():
             "instruments"         : random.sample(INSTRUMENTS, k=random.randint(1, 3)),
             "typical_trade_vol"   : round(np.random.uniform(1000, 30000), 2),
             "typical_deposit"     : round(np.random.uniform(100, 3000), 2),
+            "activity_level"      : random.choice(["low", "medium", "high"]),
+            "active_hour_start"   : random.randint(6, 10),
+            "active_hour_end"     : random.randint(18, 23),
             "is_anomalous"        : is_anomalous,
             "anomaly_type"        : anomaly_type,
+            "anomaly_group_id"    : None,
             "account_created_at"  : random_timestamp(
                 START_DATE - timedelta(days=365),
                 START_DATE
@@ -142,6 +159,10 @@ def empty_base(user_id, ts):
         "kyc_change_type"             : None,
         # ── EXTRA: account age in days at time of event
         "account_age_days"            : None,
+        # Dataset-quality and advanced anomaly metadata
+        "user_is_anomalous"           : int(0),
+        "anomaly_group_id"             : None,
+        "anomaly_severity"             : None,
     }
 
 # ── Normal event generator ────────────────────────────────────────────────────
@@ -151,8 +172,9 @@ def generate_normal_event(user_id, profile, ts=None):
 
     event_type = random.choices(EVENT_TYPES, weights=EVENT_WEIGHTS)[0]
     base = empty_base(user_id, ts)
-    base["event_type"]     = event_type
-    base["account_age_days"] = (ts - profile["account_created_at"]).days
+    base["event_type"]       = event_type
+    base["account_age_days"] = max(0, (ts - profile["account_created_at"]).days)
+    base["user_is_anomalous"] = int(profile.get("is_anomalous", False))
 
     if event_type == "login":
         country = profile["home_country"]
@@ -183,7 +205,7 @@ def generate_normal_event(user_id, profile, ts=None):
 
     elif event_type == "deposit":
         base.update({
-            "amount"              : round(np.random.normal(profile["typical_deposit"], 200), 2),
+            "amount"              : max(1.0, round(np.random.normal(profile["typical_deposit"], 200), 2)),
             "method"              : random.choice(["card", "bank", "crypto"]),
             "is_immediate_withdrawal": 0,
         })
@@ -458,6 +480,170 @@ def events_kyc_manipulator(user_id, profile, n=4):
         events.append(e_wit)
     return events
 
+
+
+# ── Advanced anomaly generators ───────────────────────────────────────────────
+
+def events_account_takeover(user_id, profile, n=6):
+    """Unfamiliar device/IP followed by failed logins and a sensitive withdrawal."""
+    events = []
+    base_ts = random_timestamp(START_DATE, END_DATE - timedelta(hours=3))
+    foreign_country = random.choice([c for c in COUNTRIES if c != profile["home_country"]])
+    suspicious_ip = random_ip()
+    new_device = random.choice([d for d in DEVICES if d != profile["preferred_device"]])
+    for i in range(max(1, n - 1)):
+        ts = base_ts + timedelta(minutes=i * random.randint(1, 4))
+        e = generate_normal_event(user_id, profile, ts)
+        e.update({
+            "event_type": "login", "ip_address": suspicious_ip,
+            "country": foreign_country, "device": new_device,
+            "login_success": 0 if i < max(1, n - 2) else 1,
+            "failed_attempts": i + 1,
+            "timezone_gap_hours": abs(timezone_offset(foreign_country) - profile["home_timezone_offset"]),
+            "is_anomalous": 1, "anomaly_type": "account_takeover",
+            "anomaly_severity": "high",
+        })
+        events.append(e)
+    ts = base_ts + timedelta(minutes=max(1, n) * 4)
+    e = generate_normal_event(user_id, profile, ts)
+    e.update({
+        "event_type": "withdrawal",
+        "amount": round(max(profile["typical_deposit"] * 8, np.random.uniform(8000, 30000)), 2),
+        "method": "crypto", "ip_address": suspicious_ip, "country": foreign_country,
+        "device": new_device, "is_anomalous": 1, "anomaly_type": "account_takeover",
+        "anomaly_severity": "critical",
+    })
+    events.append(e)
+    return events
+
+
+def events_impossible_travel(user_id, profile, n=4):
+    """Login from distant countries too close together in time."""
+    events = []
+    base_ts = random_timestamp(START_DATE, END_DATE - timedelta(hours=1))
+    countries = [profile["home_country"]]
+    choices = [c for c in COUNTRIES if c != profile["home_country"]]
+    random.shuffle(choices)
+    countries.extend(choices[:max(1, n - 1)])
+    for i, country in enumerate(countries[:n]):
+        ts = base_ts + timedelta(minutes=i * random.randint(2, 8))
+        e = generate_normal_event(user_id, profile, ts)
+        e.update({
+            "event_type": "login", "ip_address": random_ip(),
+            "country": country, "device": random.choice(DEVICES),
+            "login_success": 1, "failed_attempts": 0,
+            "timezone_gap_hours": abs(timezone_offset(country) - profile["home_timezone_offset"]),
+            "is_anomalous": 1, "anomaly_type": "impossible_travel",
+            "anomaly_severity": "high",
+        })
+        events.append(e)
+    return events
+
+
+def events_burst_activity(user_id, profile, n=12):
+    """Many trades compressed into a short time window."""
+    events = []
+    base_ts = random_timestamp(START_DATE, END_DATE - timedelta(hours=1))
+    vol = profile["typical_trade_vol"]
+    for i in range(n):
+        ts = base_ts + timedelta(seconds=i * random.randint(5, 20))
+        actual_vol = round(max(1, np.random.normal(vol * random.uniform(2.0, 5.0), vol * 0.15)), 2)
+        e = generate_normal_event(user_id, profile, ts)
+        e.update({
+            "event_type": "trade", "instrument": random.choice(profile["instruments"]),
+            "trade_volume": actual_vol, "trade_volume_vs_baseline": round(actual_vol / max(vol, 1), 3),
+            "lot_size": round(random.uniform(1, 8), 2),
+            "pnl": round(np.random.normal(0, 800), 2),
+            "trade_duration_seconds": random.randint(5, 120),
+            "margin_used": round(random.uniform(1000, 20000), 2),
+            "is_anomalous": 1, "anomaly_type": "burst_activity",
+            "anomaly_severity": "medium",
+        })
+        events.append(e)
+    return events
+
+
+def events_coordinated_accounts(user_id, profile, n=5):
+    """Events from accounts assigned to a shared synthetic group and common IP."""
+    events = []
+    group_id = profile.get("anomaly_group_id") or f"COORD_{user_id}"
+    shared_ip = profile.get("coordinated_ip") or random.choice(SHARED_IPS)
+    base_ts = profile.get("coordinated_start") or random_timestamp(START_DATE, END_DATE - timedelta(hours=2))
+    for i in range(n):
+        ts = base_ts + timedelta(minutes=i * 10 + random.randint(0, 2))
+        e = generate_normal_event(user_id, profile, ts)
+        event_type = ["deposit", "trade", "withdrawal"][i % 3]
+        e.update({
+            "event_type": event_type,
+            "ip_address": shared_ip,
+            "anomaly_group_id": group_id,
+            "is_anomalous": 1, "anomaly_type": "coordinated_accounts",
+            "anomaly_severity": "high",
+        })
+        if event_type in ("deposit", "withdrawal"):
+            e.update({
+                "amount": round(random.uniform(1500, 9000), 2),
+                "method": random.choice(["crypto", "bank"]),
+            })
+        else:
+            trade_volume = round(random.uniform(5000, 50000), 2)
+            e.update({
+                "trade_volume": trade_volume,
+                "instrument": random.choice(profile["instruments"]),
+                "trade_volume_vs_baseline": round(trade_volume / max(profile["typical_trade_vol"], 1), 3),
+            })
+        events.append(e)
+    return events
+
+
+def events_behavioural_drift(user_id, profile, n=10):
+    """Gradual increase in trade volume rather than one sudden spike."""
+    events = []
+    base_ts = random_timestamp(START_DATE, END_DATE - timedelta(hours=max(1, n)))
+    baseline = profile["typical_trade_vol"]
+    for i in range(n):
+        multiplier = 1.0 + (3.0 * (i / max(n - 1, 1)))
+        actual_vol = round(max(1, np.random.normal(baseline * multiplier, baseline * 0.08)), 2)
+        ts = base_ts + timedelta(hours=i)
+        e = generate_normal_event(user_id, profile, ts)
+        e.update({
+            "event_type": "trade", "instrument": random.choice(profile["instruments"]),
+            "trade_volume": actual_vol,
+            "trade_volume_vs_baseline": round(actual_vol / max(baseline, 1), 3),
+            "lot_size": round(random.uniform(0.1, 4), 2),
+            "pnl": round(np.random.normal(0, 400), 2),
+            "trade_duration_seconds": random.randint(30, 1800),
+            "margin_used": round(random.uniform(500, 10000), 2),
+            "is_anomalous": 1, "anomaly_type": "behavioural_drift",
+            "anomaly_severity": "medium" if i < n // 2 else "high",
+        })
+        events.append(e)
+    return events
+
+
+def assign_coordinated_groups(profiles, group_size=3):
+    """Assign coordinated anomaly profiles to groups sharing an IP and time anchor."""
+    ids = [uid for uid, profile in profiles.items() if profile.get("anomaly_type") == "coordinated_accounts"]
+    random.shuffle(ids)
+    for offset in range(0, len(ids), group_size):
+        group = ids[offset:offset + group_size]
+        if len(group) < 2:
+            # A coordinated pattern needs at least two accounts; reclassify a lone profile.
+            for uid in group:
+                profiles[uid]["anomaly_type"] = random.choice([
+                    "account_takeover", "impossible_travel", "burst_activity", "behavioural_drift"
+                ])
+            continue
+        group_id = f"COORD_{offset // group_size:04d}"
+        shared_ip = random.choice(SHARED_IPS)
+        start = random_timestamp(START_DATE, END_DATE - timedelta(hours=2))
+        for uid in group:
+            profiles[uid]["anomaly_group_id"] = group_id
+            profiles[uid]["coordinated_ip"] = shared_ip
+            profiles[uid]["coordinated_start"] = start
+    return profiles
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 ANOMALY_GENERATORS = {
     "ip_hopper"                 : events_ip_hopper,
@@ -470,51 +656,71 @@ ANOMALY_GENERATORS = {
     "consistent_winner"         : events_consistent_winner,
     "device_switcher"           : events_device_switcher,
     "kyc_manipulator"           : events_kyc_manipulator,
+    "account_takeover"           : events_account_takeover,
+    "impossible_travel"          : events_impossible_travel,
+    "burst_activity"             : events_burst_activity,
+    "coordinated_accounts"       : events_coordinated_accounts,
+    "behavioural_drift"          : events_behavioural_drift,
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def generate_dataset():
+    """Generate a reproducible synthetic dataset with event-level ground-truth labels."""
     print("Building user profiles...")
-    profiles      = build_user_profiles()
-    user_ids      = list(profiles.keys())
-    anomalous_users = [u for u, p in profiles.items() if p["is_anomalous"]]
+    profiles = build_user_profiles()
+    assign_coordinated_groups(profiles)
+    user_ids = list(profiles.keys())
+    anomalous_users = [u for u, profile in profiles.items() if profile["is_anomalous"]]
 
     all_events = []
-
     print(f"Injecting anomaly patterns for {len(anomalous_users)} users...")
     for uid in anomalous_users:
-        profile   = profiles[uid]
+        profile = profiles[uid]
         generator = ANOMALY_GENERATORS[profile["anomaly_type"]]
-        all_events.extend(generator(uid, profile))
+        generated = generator(uid, profile)
+        # Every injected event has event-level anomaly truth; preserve user-level label separately.
+        for event in generated:
+            event["user_is_anomalous"] = int(profile["is_anomalous"])
+            if event.get("anomaly_severity") is None:
+                event["anomaly_severity"] = "high"
+            if event.get("anomaly_group_id") is None:
+                event["anomaly_group_id"] = profile.get("anomaly_group_id")
+        all_events.extend(generated)
 
-    print(f"Generating remaining events to reach {N_EVENTS} total...")
+    # Fill to target. Do not relabel all events from an anomalous user as anomalous.
+    print(f"Generating ordinary events to reach {N_EVENTS} total...")
+    if len(all_events) > N_EVENTS:
+        print(f"Warning: anomaly injection produced {len(all_events)} events, above target {N_EVENTS}; trimming injected events to target.")
+        all_events = all_events[:N_EVENTS]
     remaining = N_EVENTS - len(all_events)
     for _ in range(remaining):
-        uid     = random.choice(user_ids)
+        uid = random.choice(user_ids)
         profile = profiles[uid]
-        e       = generate_normal_event(uid, profile)
-        if profile["is_anomalous"]:
-            e["is_anomalous"] = 1
-            e["anomaly_type"] = profile["anomaly_type"]
-        all_events.append(e)
+        all_events.append(generate_normal_event(uid, profile))
 
     df = pd.DataFrame(all_events)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df = df.sort_values("timestamp").reset_index(drop=True)
+    # Sequential IDs guarantee uniqueness, including across repeated random draws.
+    df["event_id"] = [f"EVT_{i:07d}" for i in range(1, len(df) + 1)]
+    df["is_anomalous"] = df["is_anomalous"].fillna(0).astype(int)
+    df["user_is_anomalous"] = df["user_is_anomalous"].fillna(0).astype(int)
 
-    Path("data/raw").mkdir(parents=True, exist_ok=True)
-    out_path = config["data"]["raw_path"]
+    out_path = Path(config["data"]["raw_path"])
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_path, index=False)
 
-    print(f"\n{'='*50}")
-    print(f"Dataset saved     : {out_path}")
-    print(f"Total events      : {len(df)}")
-    print(f"Columns           : {len(df.columns)}")
-    print(f"Anomalous users   : {len(anomalous_users)} / {N_USERS}")
-    print(f"\nEvent breakdown:")
-    print(df["event_type"].value_counts())
-    print(f"\nAnomaly breakdown:")
-    print(df[df["is_anomalous"]==1]["anomaly_type"].value_counts())
-    print(f"{'='*50}")
+    print(f"\\n{'='*56}")
+    print(f"Dataset saved       : {out_path}")
+    print(f"Total events        : {len(df)} (target: {N_EVENTS})")
+    print(f"Columns             : {len(df.columns)}")
+    print(f"Anomalous users     : {len(anomalous_users)} / {N_USERS}")
+    print(f"Anomalous events    : {int(df['is_anomalous'].sum())}")
+    print("\\nEvent breakdown:")
+    print(df["event_type"].value_counts(dropna=False))
+    print("\\nAnomaly breakdown:")
+    print(df.loc[df["is_anomalous"] == 1, "anomaly_type"].value_counts(dropna=False))
+    print(f"{'='*56}")
     return df
 
 if __name__ == "__main__":

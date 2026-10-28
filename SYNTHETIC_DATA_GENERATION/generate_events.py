@@ -15,8 +15,14 @@ SEED         = config["data"]["random_seed"]
 N_USERS      = config["data"]["n_users"]
 N_EVENTS     = config["data"]["n_events"]
 ANOMALY_FRAC = config["data"]["anomaly_fraction"]
-START_DATE = datetime.fromisoformat(config["data"].get("start_date", "2024-01-01"))
-END_DATE = datetime.fromisoformat(config["data"].get("end_date", "2024-12-31"))
+START_DATE = datetime.fromisoformat(
+    config["data"].get("start_date", "2024-01-01")
+)
+
+# Treat the configured end date as inclusive.
+END_DATE = datetime.fromisoformat(
+    config["data"].get("end_date", "2024-12-31")
+) + timedelta(days=1)
 if END_DATE <= START_DATE:
     raise ValueError("data.end_date must be later than data.start_date")
 
@@ -65,8 +71,14 @@ if not ENABLED_ANOMALY_TYPES:
     raise ValueError("At least one anomaly type must be enabled")
 
 def random_timestamp(start=START_DATE, end=END_DATE):
-    delta = end - start
-    return start + timedelta(seconds=random.randint(0, int(delta.total_seconds())))
+    """Return a random timestamp in [start, end)."""
+    if end <= start:
+        raise ValueError("end must be later than start")
+
+    delta_seconds = int((end - start).total_seconds())
+    offset = random.randrange(delta_seconds)
+
+    return start + timedelta(seconds=offset)
 
 def random_ip():
     return f"192.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}"

@@ -1,0 +1,155 @@
+ANOMX EXPLORATORY DATA ANALYSIS REPORT
+=============================================
+Dataset path: C:\Users\devsh\AnomX\data\raw\events.csv
+Total rows: 100,000
+Rows used in EDA: 100,000
+Columns: 34
+Rows excluded due to invalid timestamp or label: 0
+
+COLUMN DATA TYPES
+-------------------------
+event_id                               str
+user_id                                str
+event_type                             str
+timestamp                   datetime64[us]
+hour_of_day                          int64
+day_of_week                          int64
+is_weekend                           int64
+is_anomalous                         int64
+anomaly_type                           str
+ip_address                             str
+country                                str
+device                                 str
+login_success                      float64
+failed_attempts                    float64
+timezone_gap_hours                 float64
+instrument                             str
+lot_size                           float64
+trade_volume                       float64
+pnl                                float64
+margin_used                        float64
+trade_duration_seconds             float64
+trade_volume_vs_baseline           float64
+is_night_trade                     float64
+amount                             float64
+method                                 str
+is_immediate_withdrawal            float64
+session_duration_mins              float64
+page_clicks                        float64
+click_rate_per_min                 float64
+kyc_change_type                        str
+account_age_days                     int64
+user_is_anomalous                    int64
+anomaly_group_id                       str
+anomaly_severity                       str
+
+MISSING VALUES BY COLUMN
+-------------------------
+event_id                        0
+user_id                         0
+event_type                      0
+timestamp                       0
+hour_of_day                     0
+day_of_week                     0
+is_weekend                      0
+is_anomalous                    0
+anomaly_type                    0
+ip_address                  77981
+country                     77989
+device                      65939
+login_success               77992
+failed_attempts             77992
+timezone_gap_hours          78015
+instrument                  64778
+lot_size                    64782
+trade_volume                64778
+pnl                         64782
+margin_used                 64782
+trade_duration_seconds      64782
+trade_volume_vs_baseline    64778
+is_night_trade              64845
+amount                      74887
+method                      74887
+is_immediate_withdrawal     74933
+session_duration_mins       87927
+page_clicks                 87927
+click_rate_per_min          87927
+kyc_change_type             94121
+account_age_days                0
+user_is_anomalous               0
+anomaly_group_id            99990
+anomaly_severity            99601
+
+NUMERICAL SUMMARY
+-------------------------
+         hour_of_day    day_of_week     is_weekend   is_anomalous  login_success  failed_attempts  timezone_gap_hours      lot_size   trade_volume           pnl    margin_used  trade_duration_seconds  trade_volume_vs_baseline  is_night_trade        amount  is_immediate_withdrawal  session_duration_mins   page_clicks  click_rate_per_min  account_age_days  user_is_anomalous
+count  100000.000000  100000.000000  100000.000000  100000.000000   22008.000000     22008.000000        21985.000000  35218.000000   35222.000000  35218.000000   35218.000000            35218.000000              35222.000000    35155.000000  25113.000000             25067.000000           12073.000000  12073.000000        12073.000000     100000.000000      100000.000000
+mean       11.500590       3.002700       0.286980       0.003990       0.999046         0.053526            0.017921      1.039892   15594.692579      2.426202    2653.418574             1824.232523                  1.032950        0.246025   1255.400293                 0.001596              32.292264     43.437836            3.493819        363.358250           0.052790
+std         6.913004       2.001902       0.452354       0.063041       0.030876         0.246293            0.371156      1.089490   13921.548590    221.350582    3573.166687             1022.020650                  0.782565        0.430699   1352.152635                 0.039915              16.005814     29.989966           36.568569        148.275124           0.223615
+min         0.000000       0.000000       0.000000       0.000000       0.000000         0.000000            0.000000      0.010000     506.950000  -1055.400000     100.130000                1.000000                  0.187000        0.000000      1.000000                 0.000000               0.200000      5.000000            0.080000          0.000000           0.000000
+25%         6.000000       1.000000       0.000000       0.000000       1.000000         0.000000            0.000000      0.520000    6952.845000   -134.917500    1325.980000              939.000000                  0.869000        0.000000    445.340000                 0.000000              18.300000     24.000000            0.730000        256.000000           0.000000
+50%        12.000000       3.000000       0.000000       0.000000       1.000000         0.000000            0.000000      1.010000   14505.675000     -0.560000    2543.845000             1825.000000                  1.004000        0.000000   1070.030000                 0.000000              32.300000     43.000000            1.310000        364.000000           0.000000
+75%        17.000000       5.000000       1.000000       0.000000       1.000000         0.000000            0.000000      1.510000   22371.997500    135.350000    3779.070000             2707.000000                  1.139000        0.000000   1869.920000                 0.000000              46.100000     62.000000            2.340000        469.000000           0.000000
+max        23.000000       6.000000       1.000000       1.000000       1.000000         5.000000           13.000000     49.840000  498463.070000   4852.070000  197528.220000             3599.000000                 47.042000        1.000000  48632.210000                 1.000000              60.000000    594.000000         1955.000000        726.000000           1.000000
+
+ANOMALY SUMMARY
+-------------------------
+Normal events: 99,601
+Anomalous events: 399
+Anomaly rate: 0.399%
+
+EVENT TYPE COUNTS
+-------------------------
+event_type
+trade         35137
+login         21943
+deposit       15072
+session       12025
+withdrawal     9966
+kyc_change     5857
+
+ANOMALY TYPE COUNTS
+-------------------------
+anomaly_type
+burst_activity               48
+ip_hopper                    48
+deposit_withdrawal_cycler    40
+behavioural_drift            40
+kyc_manipulator              32
+bot_trader                   32
+consistent_winner            30
+structurer                   24
+account_takeover             24
+device_switcher              24
+wash_trader                  20
+impossible_travel            12
+coordinated_accounts         10
+dormant_withdrawer            9
+brute_forcer                  6
+
+TRADE_VOLUME BY ANOMALY LABEL
+-------------------------
+              count          mean    median            std
+is_anomalous                                              
+0             34995  15178.815244  14458.90    9362.858842
+1               227  79707.588414  39773.04  111691.614670
+
+ACCOUNT_AGE_DAYS BY ANOMALY LABEL
+-------------------------
+              count       mean  median         std
+is_anomalous                                      
+0             99601  363.35084   364.0  148.265355
+1               399  365.20802   378.0  150.871653
+
+TIME RANGE
+-------------------------
+Earliest event: 2025-01-01 00:00:46
+Latest event: 2025-12-30 23:46:49
+
+INTERPRETATION NOTES
+-------------------------
+- EDA describes the generated dataset; it does not prove realism.
+- Box plots hide outliers to make the central distributions easier to compare.
+- Daily counts show event volume, not necessarily unique users.
+- Large differences between classes may be caused by the generator.
+- Investigate possible label leakage before model training.
